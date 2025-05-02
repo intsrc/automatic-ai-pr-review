@@ -1,0 +1,69 @@
+name: AI PR Review
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read          # read the code
+  pull-requests: write    # write a comment
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2          # base + head
+
+      - name: Detect base SHA and head
+        id: vars
+        run: |
+          echo "base=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
+          echo "head=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Generate diff (12K symbols = 4k tokens estimated)
+        id: diff
+        run: |
+          git fetch origin "${{ steps.vars.outputs.base }}" --depth=1
+          git diff --unified=0 "${{ steps.vars.outputs.base }}" "${{ steps.vars.outputs.head }}" > full.diff
+          head -c 12000 full.diff > pr.diff
+
+      - name: Send diff to ChatGPT (o4‑mini)
+        id: chat
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          # сформувати запит до OpenAI
+          jq -n --rawfile diff pr.diff '
+          {
+            model: "gpt-4o-mini",
+            temperature: 0.2,
+            max_tokens: 1024,
+            messages: [
+              {
+                role: "system",
+                content: "Review this PR and focus on potential issues, bugs, clean code and best code practices. Make sure that logging is on point and code is easily debugable and monitorable. Format with Markdown‑ом."
+              },
+              { role: "user", content: $diff }
+            ]
+          }' > request.json
+      
+          # AI Request
+          curl -s https://api.openai.com/v1/chat/completions \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d @request.json \
+            | jq -r '.choices[0].message.content' > review.md
+      
+      - name: Publish PR comment
+        env:
+          GH_TOKEN: ${{ github.token }}   # automatic token for GitHub
+        run: |
+          gh api \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            -f body="$(cat review.md)"

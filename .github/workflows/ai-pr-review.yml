@@ -39,7 +39,7 @@ jobs:
           # сформувати запит до OpenAI
           jq -n --rawfile diff pr.diff '
           {
-            model: "gpt-4o-mini",
+            model: "o4-mini-2025-04-16",
             temperature: 0.2,
             max_tokens: 1024,
             messages: [

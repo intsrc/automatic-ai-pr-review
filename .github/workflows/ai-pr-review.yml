@@ -38,17 +38,10 @@ jobs:
         run: |
           jq -n --rawfile diff pr.diff '
           {
-            model: "o4-mini-2025-04-16",
-            temperature: 0.2,
-            max_tokens: 1024,
-            reasoning: {
-              effort: "medium"
-            },
-            messages: [
-              {
-                role: "system",
-                content: "Review this PR and focus on potential issues, bugs, clean code and best code practices. Make sure that logging is on point and code is easily debugable and monitorable. Format with Markdown‑ом."
-              },
+            model: "o4-mini",
+            reasoning: { effort: "medium" },
+            input: [
+              { role: "system", content: "You are a seasoned code reviewer. Analyze the diff, highlight bugs, style issues, security risks, and suggest improvements. Respond in Markdown." },
               { role: "user", content: $diff }
             ]
           }' > request.json

@@ -46,19 +46,38 @@ jobs:
             ]
           }' > request.json
       
-          # AI Request
-          curl -s https://api.openai.com/v1/responses \
+          # 2) Call /v1/responses and capture full response
+          HTTP_CODE=$(curl -sS -w "%{http_code}" -o response.json \
             -H "Authorization: Bearer $OPENAI_API_KEY" \
             -H "Content-Type: application/json" \
-            -d @request.json \
-            | jq -r '.choices[0].message.content' > review.md
-      
-      - name: Publish PR comment
+            https://api.openai.com/v1/responses \
+            --data-binary @request.json)
+
+          echo "OpenAI Responses API HTTP $HTTP_CODE"
+          echo "Full response:" >&2
+          jq '.' response.json >&2
+
+          # 3) Fail on any API error
+          if jq -e '.error' response.json > /dev/null; then
+            echo "::error::OpenAI API error: $(jq -r '.error.message' response.json)"
+            exit 1
+          fi
+
+          # 4) Extract textual output from the `output` array
+          jq -r '
+            # Find all output items with text content
+            [.output[]
+              | if (has("content") and (.content | type == "string")) then .content
+                elif (has("content") and (.content | type == "array")) then (.content[] | .text? // empty)
+                else empty end
+            ]
+            # Join different segments with two newlines
+            | join("\n\n")
+          ' response.json > review.md
+
+      - name: Publish PR comment
         env:
-          GH_TOKEN: ${{ github.token }}   # automatic token for GitHub
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh api \
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+          gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
             -f body="$(cat review.md)"

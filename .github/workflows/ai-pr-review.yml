@@ -13,23 +13,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout PR
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2          # base + head
-
-      - name: Detect base SHA and head
-        id: vars
-        run: |
-          echo "base=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
-          echo "head=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
-
-      - name: Generate diff (12K symbols = 4k tokens estimated)
+      - name: Generate PR diff via GitHub CLI
         id: diff
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git fetch origin "${{ steps.vars.outputs.base }}" --depth=1
-          git diff --unified=0 "${{ steps.vars.outputs.base }}" "${{ steps.vars.outputs.head }}" > full.diff
-          head -c 12000 full.diff > pr.diff
+          gh pr diff ${{ github.event.pull_request.number }} > pr.diff
 
       - name: Send diff to ChatGPT (o4‑mini)
         id: chat

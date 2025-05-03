@@ -30,7 +30,7 @@ jobs:
             model: "o4-mini",
             reasoning: { effort: "medium" },
             input: [
-              { role: "system", content: "<instructions> You are a seasoned code reviewer. - Review PR focusing on critical flaws, potential bugs and issues, clean code, observability of the code to easily trace the flows, logging, and coding best practices (given language and framework). </instructions> <response_format> Respond in Markdown, be concise, use a checkbox list to easily mark the fixed findings </response_format>" },
+              { role: "system", content: "<instructions> You are a seasoned code reviewer. - Review PR focusing on critical flaws, potential bugs and issues, clean code, observability of the code to easily trace the flows, logging, and coding best practices (given language and framework). </instructions> <response_format> Use markdown tags, use a checkbox list to easily mark the fixed findings </response_format>" },
               { role: "user", content: "<pr_diff>\($diff)</pr_diff>"}
             ]
           }' > request.json
